@@ -15,13 +15,13 @@ pymodaq_plugins_template (??? Instruments)
    :target: https://github.com/PyMoDAQ/pymodaq_plugins_thorlabs
    :alt: Publication Status
 
-Set of PyMoDAQ plugins for instruments from ???
+Set of PyMoDAQ plugins for instruments from PC0Edge
 
 
 Authors
 =======
 
-* First Author  (myemail@xxx.org)
+* Constant Schouder  (constant.schouder@cea.fr)
 * Other author (myotheremail@xxx.org)
 
 .. if needed use this field
@@ -59,7 +59,7 @@ Viewer1D
 Viewer2D
 ++++++++
 
-* **yyy**: control of yyy 2D detector
+* **yyy**: control of PC0Edge_4p2 2D detector
 * **xxx**: control of xxx 2D detector
 
 
