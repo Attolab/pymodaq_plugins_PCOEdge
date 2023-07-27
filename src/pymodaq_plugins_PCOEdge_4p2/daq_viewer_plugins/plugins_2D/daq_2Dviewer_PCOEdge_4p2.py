@@ -1,7 +1,7 @@
-from pymodaq.daq_utils.daq_utils import ThreadCommand
-from pymodaq.daq_utils.daq_utils import DataFromPlugins, Axis
+from pymodaq.utils.daq_utils import ThreadCommand
+from pymodaq.utils.daq_utils import DataFromPlugins, Axis
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, comon_parameters, main
-from pymodaq.daq_utils.parameter import Parameter
+from pymodaq.utils.parameter import Parameter
 from qtpy import QtCore,QtWidgets
 import numpy as np
 
@@ -26,15 +26,13 @@ class DAQ_2DViewer_PCOEdge_4p2(DAQ_Viewer_base):
         ############
         {'title': 'Camera name:', 'name': 'camera_name', 'type': 'str', 'value': '', 'readonly': True},
         {'title': 'Serial number:', 'name': 'serial_number', 'type': 'list', 'limits': serialnumbers},
-        {'title': 'Update ROI', 'name': 'update_roi', 'type': 'bool_push', 'value': False},
-        {'title': 'Clear ROI+Bin', 'name': 'clear_roi', 'type': 'bool_push', 'value': False},
         {'title': 'X binning', 'name': 'x_binning', 'type': 'int', 'value': 1},
         {'title': 'Y binning', 'name': 'y_binning', 'type': 'int', 'value': 1},
         {'title': 'Image width', 'name': 'hdet', 'type': 'int', 'value': 1, 'readonly': True},
         {'title': 'Image height', 'name': 'vdet', 'type': 'int', 'value': 1, 'readonly': True},
         {'title': 'Timing', 'name': 'timing_opts', 'type': 'group', 'children':
-            [{'title': 'Exposure Time (ms)', 'name': 'exposure_time', 'type': 'int', 'value': 1},
-            {'title': 'Compute FPS', 'name': 'fps_on', 'type': 'bool', 'value': True},
+            [{'title': 'Exposure Time (ms)', 'name': 'exposure_time', 'type': 'int', 'value': 100},
+             {'title': 'Frame delay', 'name': 'frame_delay', 'type': 'float', 'value': 100},
             {'title': 'FPS', 'name': 'fps', 'type': 'float', 'value': 0.0, 'readonly': True}]
         }        
     ]
@@ -60,7 +58,10 @@ class DAQ_2DViewer_PCOEdge_4p2(DAQ_Viewer_base):
             A given parameter (within detector_settings) whose value has been changed by the user
         """
         if param.name() == "exposure_time":
-            self.controller.set_exposure(param.value()/1000)        
+            self.controller.set_exposure(param.value()/1000)
+        elif param.name() == 'frame_delay':
+            self.controller.set_frame_delay(param.value)
+
 
     def ini_detector(self, controller=None):
         """Detector communication initialization
@@ -82,10 +83,10 @@ class DAQ_2DViewer_PCOEdge_4p2(DAQ_Viewer_base):
                                    new_controller=PCO.PCOSC2Camera(self.settings.child('serial_number').value()))
         else:
             raise Exception('No compatible PCO was found.')        
-        
-        self.controller.get_cameras_number()
+        print(self.controller)        
         # Get camera name
-        self.settings.child('camera_name').setValue(self.controller.get_device_info().name)
+        # self.settings.child('camera_name').setValue(self.controller.get_device_info().name)
+        self.settings.child('serial_number').setValue(self.controller.get_device_info().serial_number)
         # Set exposure time
         self.controller.set_exposure(self.settings.child('timing_opts', 'exposure_time').value()/1000)        
         # Update image parameters
@@ -117,7 +118,7 @@ class DAQ_2DViewer_PCOEdge_4p2(DAQ_Viewer_base):
 
 
         ## TODO for your custom plugin. Initialize viewers pannel with the future type of data
-        self.data_grabed_signal.emit([DataFromPlugins(name='PCOEdge_4p2 Camera', data=["2D numpy array"],
+        self.data_grabed_signal_temp.emit([DataFromPlugins(name='PCOEdge_4p2 Camera', data=[np.zeros((width, height)),],
                                                            dim='Data2D', labels=['dat0'],
                                                            x_axis=self.x_axis,
                                                            y_axis=self.y_axis), ])
@@ -158,9 +159,10 @@ class DAQ_2DViewer_PCOEdge_4p2(DAQ_Viewer_base):
         try:
             # Get  data from buffer
             frame = self.controller.read_newest_image()
+            self.settings.child('timing_opts','frame_delay').setValue(self.controller.get_frame_delay())
             # Emit the frame.
             if frame is not None:       # happens for last frame when stopping camera
-                self.data_grabed_signal_temp.emit([DataFromPlugins(name='PCOEdge_4p2 Camera', data=["2D numpy array"],
+                self.data_grabed_signal.emit([DataFromPlugins(name='PCOEdge_4p2 Camera', data=[np.squeeze(frame)],
                                                                 dim=self.data_shape, labels=['dat0'],
                                                                 x_axis=self.x_axis,
                                                                 y_axis=self.y_axis), ])
@@ -183,7 +185,7 @@ class DAQ_2DViewer_PCOEdge_4p2(DAQ_Viewer_base):
         """
         # Terminate the communication        
         self.controller.close()
-        self.controller: PCO = None
+        self.controller: PCO.PCOSC2Camera = None
         self.callback_thread.quit()
         self.callback_thread = None
         self.status.initialized = False
@@ -207,7 +209,7 @@ class PCOCallback(QtCore.QObject):
     def wait_for_acquisition(self):
         new_data = self.wait_fn()
         if new_data is not False: #will be returned if the main thread called CancelWait
-            self.data_sig.emit()
+            self.data_sig.emit()  
 
 if __name__ == '__main__':
-    main(__file__)
+    main(__file__,init=False)
